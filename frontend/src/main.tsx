@@ -1,5 +1,28 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import {
+  Badge,
+  Button,
+  Field,
+  FluentProvider,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Select,
+  Textarea,
+  Toolbar,
+  ToolbarButton,
+  createLightTheme,
+} from "@fluentui/react-components";
+import {
+  Add20Regular,
+  ArrowReset20Regular,
+  Checkmark20Regular,
+  Dismiss20Regular,
+  DocumentText20Regular,
+  Save20Regular,
+  SignOut20Regular,
+} from "@fluentui/react-icons";
 import "./style.css";
 import type { SupplierCase as Case } from "./types";
 import { sandboxMode, sandboxApi, resetSandbox } from "./sandbox";
@@ -25,6 +48,56 @@ async function api(path: string, options: RequestInit = {}) {
     throw new Error(result.error || `Request failed (${response.status})`);
   return result;
 }
+const theme = createLightTheme({
+  10: "#001214",
+  20: "#00262b",
+  30: "#003b42",
+  40: "#004751",
+  50: "#005562",
+  60: "#006471",
+  70: "#006e7a",
+  80: "#007b86",
+  90: "#238995",
+  100: "#4098a3",
+  110: "#5da7b1",
+  120: "#79b6bf",
+  130: "#96c6cd",
+  140: "#b3d6dc",
+  150: "#d0e6e9",
+  160: "#edf6f7",
+});
+type Citation = { document: number; page: number; quote: string };
+function Status({ value }: { value: string }) {
+  const color =
+    value === "conflict" || value === "rejected"
+      ? "danger"
+      : value === "missing"
+        ? "warning"
+        : ["matched", "resolved", "approved"].includes(value)
+          ? "success"
+          : "informative";
+  return (
+    <Badge className="status-badge" appearance="tint" color={color}>
+      {value === "pending" ? "Needs review" : value}
+    </Badge>
+  );
+}
+function SourceText({ text, quote }: { text: string; quote?: string }) {
+  const start = quote ? text.indexOf(quote) : -1;
+  return (
+    <pre>
+      {start < 0 ? (
+        text
+      ) : (
+        <>
+          {text.slice(0, start)}
+          <mark>{quote}</mark>
+          {text.slice(start + quote!.length)}
+        </>
+      )}
+    </pre>
+  );
+}
 function App() {
   const [user, setUser] = useState<string | null>(null),
     [loaded, setLoaded] = useState(false),
@@ -38,6 +111,23 @@ function App() {
     [reason, setReason] = useState(""),
     [source, setSource] = useState<number | null>(null);
   const current = cases.find((c) => c.id === selected);
+  const unresolvedCount = current
+    ? Object.values(current.fields).filter((f) =>
+        ["missing", "conflict"].includes(f.state),
+      ).length
+    : 0;
+  const [citation, setCitation] = useState<Citation | null>(null);
+  const selectedDocument = current?.documents.find((d) => d.id === source);
+  useEffect(() => {
+    setSource(current?.documents[0]?.id ?? null);
+    setCitation(null);
+  }, [current?.id]);
+  useEffect(() => {
+    if (citation)
+      document
+        .getElementById(`source-page-${citation.page}`)
+        ?.scrollIntoView({ block: "nearest", behavior: "instant" });
+  }, [citation]);
   async function refresh() {
     const data = await api("/cases");
     setCases(data.cases);
@@ -87,40 +177,19 @@ function App() {
     });
   }
   return (
-    <>
-      <header>
+    <FluentProvider theme={theme} className="app-shell">
+      <a className="skip-link" href="#main">
+        Skip to review workspace
+      </a>
+      <header className="app-bar">
         <a className="brand" href="#main">
-          <span className="brand-mark">S</span> Supplier Studio
+          <span className="brand-mark">S</span>Supplier Studio
         </a>
-        <div className="header-meta">
-          <span className="mode">
-            {sandboxMode
-              ? "Interactive sandbox · synthetic documents · no live AI calls"
-              : mode === "baseline"
-                ? "Deterministic demo · no model"
-                : "OpenAI extraction"}
-          </span>
-          {sandboxMode && (
-            <button
-              className="quiet"
-              onClick={() =>
-                act(async () => {
-                  resetSandbox();
-                  setSelected(1);
-                  setCorrections({});
-                  setReason("");
-                  setSource(null);
-                  await refresh();
-                  setNotice("Sandbox reset to the original synthetic example.");
-                })
-              }
-            >
-              Reset demo
-            </button>
-          )}
-          {user && !sandboxMode && (
-            <button
-              className="quiet"
+        <span className="app-context">Supplier operations</span>
+        {user && !sandboxMode && (
+          <Toolbar aria-label="Account actions">
+            <ToolbarButton
+              icon={<SignOut20Regular />}
               disabled={busy}
               onClick={() =>
                 act(async () => {
@@ -134,27 +203,60 @@ function App() {
               }
             >
               Sign out
-            </button>
+            </ToolbarButton>
+          </Toolbar>
+        )}
+      </header>
+      <div className="environment-bar">
+        <span>
+          {sandboxMode
+            ? "Interactive sandbox · synthetic documents · no live AI calls"
+            : mode === "baseline"
+              ? "Local demo · deterministic extraction · no model calls"
+              : "Local workspace · OpenAI extraction"}
+        </span>
+        {sandboxMode && (
+          <Button
+            icon={<ArrowReset20Regular />}
+            size="small"
+            onClick={() =>
+              act(async () => {
+                resetSandbox();
+                setSelected(1);
+                setCorrections({});
+                setReason("");
+                setSource(null);
+                setCitation(null);
+                await refresh();
+                setNotice("Sandbox reset to the original synthetic example.");
+              })
+            }
+          >
+            Reset demo
+          </Button>
+        )}
+      </div>
+      <main id="main">
+        <div className="feedback" role="alert">
+          {error && (
+            <MessageBar intent="error">
+              <MessageBarBody>{error}</MessageBarBody>
+            </MessageBar>
           )}
         </div>
-      </header>
-      <main id="main">
-        <div role="alert">{error && <p className="error">{error}</p>}</div>
-        <div role="status">{notice && <p className="notice">{notice}</p>}</div>
+        <div className="feedback" role="status">
+          {notice && (
+            <MessageBar intent="success">
+              <MessageBarBody>{notice}</MessageBarBody>
+            </MessageBar>
+          )}
+        </div>
         {!loaded ? (
-          <p>Loading workspace…</p>
+          <div className="loading">Loading workspace…</div>
         ) : !user ? (
-          <section className="login">
-            <p className="eyebrow">EVIDENCE BEFORE APPROVAL</p>
-            <h1>
-              Good suppliers.
-              <br />
-              Clear decisions.
-            </h1>
-            <p>
-              Review the evidence, resolve contradictions, and keep a record of
-              every decision.
-            </p>
+          <section className="login-panel">
+            <h1>Sign in to Supplier Studio</h1>
+            <p>Review supplier documents and record your decisions.</p>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -169,308 +271,337 @@ function App() {
                 });
               }}
             >
-              <label>
-                Username
-                <input
+              <Field label="Username" required>
+                <Input
                   name="username"
                   defaultValue="reviewer"
                   autoComplete="username"
                   required
                 />
-              </label>
-              <label>
-                Password
-                <input
+              </Field>
+              <Field label="Password" required>
+                <Input
                   name="password"
                   type="password"
                   defaultValue="local-review-only"
                   autoComplete="current-password"
                   required
                 />
-              </label>
-              <button disabled={busy}>Enter demo workspace →</button>
+              </Field>
+              <Button appearance="primary" type="submit" disabled={busy}>
+                Enter demo workspace
+              </Button>
             </form>
-            <p className="small">
+            <p className="helper">
               Local demo credentials shown for convenience. Synthetic documents
               only. One shared reviewer workspace.
             </p>
           </section>
         ) : (
-          <>
-            <section className="intro">
-              <div>
-                <p className="eyebrow">SUPPLIER OPERATIONS / REVIEW DESK</p>
-                <h1>Evidence, then confidence.</h1>
-                <p>
-                  Every extracted field has a source. Every decision has a
-                  human.
-                </p>
+          <div className="workbench">
+            <aside className="queue" aria-label="Application queue">
+              <div className="queue-heading">
+                <h2>Applications</h2>
+                <span className="count">{cases.length}</span>
               </div>
-              <div className="workspace-tag">
-                <span className="dot" />{" "}
-                {sandboxMode ? "Browser-local sandbox" : "Local demo workspace"}
-              </div>
-            </section>
-            <div className="workspace">
-              <aside>
-                <div className="section-heading">
-                  <h2>Applications</h2>
-                  <span>{cases.length.toString().padStart(2, "0")}</span>
-                </div>
-                <div className="case-list">
-                  {cases.map((c) => (
-                    <button
-                      className={`case-option ${selected === c.id ? "active" : ""}`}
-                      key={c.id}
-                      onClick={() => {
-                        setSelected(c.id);
-                        setCorrections({});
-                        setReason("");
-                        setSource(null);
-                        setNotice("");
-                      }}
-                    >
-                      <span>{c.name}</span>
-                      <small>
-                        {c.status === "pending" ? "Awaiting review" : c.status}
-                      </small>
-                    </button>
-                  ))}
-                </div>
-                <form
-                  className="new-case"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const form = e.currentTarget;
-                    const name = new FormData(form).get("name");
-                    act(async () => {
-                      const c = await api("/cases", {
-                        method: "POST",
-                        body: JSON.stringify({ name }),
-                      });
-                      setCases((items) => [c, ...items]);
+              <div className="case-list">
+                {cases.map((c) => (
+                  <Button
+                    appearance="subtle"
+                    className={`case-option ${selected === c.id ? "active" : ""}`}
+                    key={c.id}
+                    aria-pressed={selected === c.id}
+                    onClick={() => {
                       setSelected(c.id);
                       setCorrections({});
                       setReason("");
                       setSource(null);
-                      form.reset();
+                      setCitation(null);
+                      setNotice("");
+                    }}
+                  >
+                    <span className="case-name">{c.name}</span>
+                    <span className="case-meta">
+                      <span>Application {String(c.id).padStart(3, "0")}</span>
+                      <Status value={c.status} />
+                    </span>
+                  </Button>
+                ))}
+              </div>
+              <form
+                className="new-case"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  const name = new FormData(form).get("name");
+                  act(async () => {
+                    const c = await api("/cases", {
+                      method: "POST",
+                      body: JSON.stringify({ name }),
                     });
-                  }}
+                    setCases((items) => [c, ...items]);
+                    setSelected(c.id);
+                    setCorrections({});
+                    setReason("");
+                    setSource(null);
+                    setCitation(null);
+                    form.reset();
+                  });
+                }}
+              >
+                <Field label="New supplier">
+                  <Input
+                    name="name"
+                    placeholder="Supplier name…"
+                    maxLength={160}
+                    required
+                  />
+                </Field>
+                <Button
+                  appearance="primary"
+                  icon={<Add20Regular />}
+                  type="submit"
+                  disabled={busy}
                 >
-                  <label>
-                    New supplier
-                    <input
-                      name="name"
-                      placeholder="Supplier name"
-                      maxLength={160}
-                      required
-                    />
-                  </label>
-                  <button className="secondary" disabled={busy}>
-                    + Create application
-                  </button>
-                </form>
-                <div className="aside-note">
-                  <strong>A deliberately difficult example</strong>
-                  <p>
-                    Cedar Works has conflicting registration numbers. Compare
-                    the certificate with the form, then record your resolution.
-                  </p>
-                </div>
-              </aside>
-              {current ? (
-                <section className="review">
+                  Create application
+                </Button>
+              </form>
+              <div className="queue-footer">
+                {sandboxMode
+                  ? "Changes are saved in this browser."
+                  : "One shared reviewer workspace."}
+              </div>
+            </aside>
+            {current ? (
+              <div className="case-workspace">
+                <section
+                  className="evidence-pane"
+                  aria-labelledby="case-heading"
+                >
                   <div className="case-heading">
                     <div>
-                      <p className="eyebrow">
-                        APPLICATION {String(current.id).padStart(3, "0")}
-                      </p>
-                      <h2>{current.name}</h2>
+                      <h1 id="case-heading">{current.name}</h1>
+                      <div className="case-summary">
+                        <span>
+                          <DocumentText20Regular aria-hidden="true" />
+                          {current.documents.length} documents
+                        </span>
+                        <span>
+                          {unresolvedCount}{" "}
+                          {unresolvedCount === 1 ? "field" : "fields"} to
+                          resolve
+                        </span>
+                        <span>
+                          {current.ready
+                            ? "Ready for approval"
+                            : "Review required"}
+                        </span>
+                      </div>
                     </div>
-                    <span className={`badge ${current.status}`}>
-                      {current.status === "pending"
-                        ? "Needs review"
-                        : current.status}
-                    </span>
+                    <Status value={current.status} />
                   </div>
-                  <div className="summary">
-                    <div>
-                      <strong>{current.documents.length}</strong>
-                      <span>Documents received</span>
-                    </div>
-                    <div>
-                      <strong>
-                        {
-                          Object.values(current.fields).filter((f) =>
-                            ["missing", "conflict"].includes(f.state),
-                          ).length
-                        }
-                      </strong>
-                      <span>Fields to resolve</span>
-                    </div>
-                    <div>
-                      <strong>{current.ready ? "Ready" : "Review"}</strong>
-                      <span>Approval readiness</span>
-                    </div>
-                  </div>
-                  <section>
-                    <div className="section-heading">
-                      <h3>01 / Document pack</h3>
-                      <span>TXT or text-based PDF · 5 MB max</span>
-                    </div>
-                    <div className="documents">
-                      {current.documents.map((d) => (
-                        <button
-                          className={`document ${source === d.id ? "selected" : ""}`}
-                          key={d.id}
-                          onClick={() =>
-                            setSource(source === d.id ? null : d.id)
-                          }
-                        >
-                          <span className="file-icon">↗</span>
-                          <span>
-                            <strong>{d.name}</strong>
-                            <small>
-                              {d.kind} · {d.pages.length} page
-                              {d.pages.length !== 1 ? "s" : ""} · {d.mode}
-                            </small>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    {source &&
-                      current.documents
-                        .filter((d) => d.id === source)
-                        .map((d) => (
-                          <div className="source" key={d.id}>
-                            <div className="section-heading">
-                              <h4>Source text · {d.name}</h4>
-                              <button
-                                className="quiet"
-                                onClick={() => setSource(null)}
-                              >
-                                Close
-                              </button>
-                            </div>
-                            {d.pages.map((p, i) => (
-                              <div key={i}>
-                                <small>PAGE {i + 1}</small>
-                                <pre>{p}</pre>
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                    {current.missing_documents.length > 0 && (
-                      <p className="warning">
-                        Required documents missing:{" "}
-                        {current.missing_documents.join(", ")}.
-                      </p>
-                    )}
-                    {current.status === "pending" && (
-                      <form
-                        className="upload"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          const form = e.currentTarget;
-                          const data = new FormData(form);
-                          act(async () => {
-                            update(
-                              await api(`/cases/${current.id}/documents`, {
-                                method: "POST",
-                                body: data,
-                              }),
-                            );
-                            setCorrections({});
-                            form.reset();
-                            setNotice(
-                              sandboxMode
-                                ? "Synthetic fixture added. Previous corrections cleared for review."
-                                : "Document extracted. Previous corrections cleared for a fresh evidence review.",
-                            );
-                          });
+                  <div className="document-tabs" aria-label="Documents">
+                    {current.documents.map((d) => (
+                      <Button
+                        appearance="subtle"
+                        className={source === d.id ? "selected" : ""}
+                        key={d.id}
+                        aria-pressed={source === d.id}
+                        onClick={() => {
+                          setSource(source === d.id ? null : d.id);
+                          setCitation(null);
                         }}
                       >
-                        <label>
-                          Document type
-                          <select name="kind">
-                            <option value="registration">
-                              Registration certificate
-                            </option>
-                            <option value="bank">Bank confirmation</option>
-                            <option value="form">Onboarding form</option>
-                          </select>
-                        </label>
-                        {sandboxMode ? (
-                          <p className="small">
-                            Adds a bundled synthetic fixture. Real uploads run
-                            in the local full-stack app.
-                          </p>
-                        ) : (
-                          <label>
-                            Choose document
+                        {d.name}
+                      </Button>
+                    ))}
+                  </div>
+                  {selectedDocument ? (
+                    <div className="source-view">
+                      <div className="source-toolbar">
+                        <span>
+                          {selectedDocument.kind} ·{" "}
+                          {selectedDocument.pages.length} page
+                          {selectedDocument.pages.length !== 1
+                            ? "s"
+                            : ""} · {selectedDocument.mode}
+                        </span>
+                        <Button
+                          appearance="subtle"
+                          size="small"
+                          icon={<Dismiss20Regular />}
+                          onClick={() => {
+                            setSource(null);
+                            setCitation(null);
+                          }}
+                        >
+                          Close
+                        </Button>
+                      </div>
+                      <div
+                        className="source-pages"
+                        tabIndex={0}
+                        aria-label={`Source text: ${selectedDocument.name}`}
+                      >
+                        {selectedDocument.pages.map((text, i) => (
+                          <section
+                            className="source-page"
+                            id={`source-page-${i + 1}`}
+                            key={i}
+                          >
+                            <span className="page-number">Page {i + 1}</span>
+                            <SourceText
+                              text={text}
+                              quote={
+                                citation?.document === selectedDocument.id &&
+                                citation.page === i + 1
+                                  ? citation.quote
+                                  : undefined
+                              }
+                            />
+                          </section>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="source-empty">
+                      <DocumentText20Regular aria-hidden="true" />
+                      <h2>
+                        {current.documents.length
+                          ? "Select a document"
+                          : "No documents yet"}
+                      </h2>
+                      <p>
+                        {current.documents.length
+                          ? "Choose a document or a field citation to inspect its source text."
+                          : "Add the required document types to start reviewing this supplier."}
+                      </p>
+                    </div>
+                  )}
+                  {current.missing_documents.length > 0 && (
+                    <MessageBar intent="warning">
+                      <MessageBarBody>
+                        Required documents missing:{" "}
+                        {current.missing_documents.join(", ")}.
+                      </MessageBarBody>
+                    </MessageBar>
+                  )}
+                  {current.status === "pending" && (
+                    <form
+                      className="upload-form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const form = e.currentTarget;
+                        const data = new FormData(form);
+                        act(async () => {
+                          update(
+                            await api(`/cases/${current.id}/documents`, {
+                              method: "POST",
+                              body: data,
+                            }),
+                          );
+                          setCorrections({});
+                          form.reset();
+                          setNotice(
+                            sandboxMode
+                              ? "Synthetic fixture added. Previous corrections cleared for review."
+                              : "Document extracted. Previous corrections cleared for a fresh evidence review.",
+                          );
+                        });
+                      }}
+                    >
+                      <Field label="Document type">
+                        <Select name="kind">
+                          <option value="registration">
+                            Registration certificate
+                          </option>
+                          <option value="bank">Bank confirmation</option>
+                          <option value="form">Onboarding form</option>
+                        </Select>
+                      </Field>
+                      {sandboxMode ? (
+                        <p className="helper">
+                          Adds a bundled synthetic fixture. Real uploads run in
+                          the local full-stack app.
+                        </p>
+                      ) : (
+                        <Field
+                          label="Choose document"
+                          hint="TXT or text-based PDF · 5 MB max"
+                        >
+                          {(fieldProps) => (
                             <input
+                              {...fieldProps}
+                              className="file-input"
                               type="file"
                               name="file"
                               accept=".txt,.pdf"
                               required
                             />
-                          </label>
-                        )}
-                        <button className="secondary" disabled={busy}>
-                          {sandboxMode
-                            ? "Add synthetic fixture"
-                            : "Upload & extract"}
-                        </button>
-                      </form>
-                    )}
-                  </section>
-                  <section>
-                    <div className="section-heading">
-                      <h3>02 / Extracted evidence</h3>
-                      <span>Compare before correcting</span>
-                    </div>
+                          )}
+                        </Field>
+                      )}
+                      <Button
+                        type="submit"
+                        icon={<Add20Regular />}
+                        disabled={busy}
+                      >
+                        {sandboxMode
+                          ? "Add synthetic fixture"
+                          : "Upload & extract"}
+                      </Button>
+                    </form>
+                  )}
+                </section>
+                <section className="review-pane" aria-label="Review details">
+                  <h2>Review details</h2>
+                  <p className="review-guidance helper">
+                    Corrections are optional and require a reason.
+                  </p>
+                  <div className="review-fields">
                     {Object.entries(current.fields).map(([key, field]) => (
-                      <article className="field" key={key}>
-                        <div className="field-top">
-                          <h4>{field.label}</h4>
-                          <span className={`badge ${field.state}`}>
-                            {field.state}
-                          </span>
+                      <section className="field-section" key={key}>
+                        <div className="field-heading">
+                          <h3>{field.label}</h3>
+                          <Status value={field.state} />
                         </div>
-                        <strong className="field-value">
+                        <div className="extracted-value">
                           {field.value || "No evidence found"}
-                        </strong>
-                        <div className="evidence-list">
+                        </div>
+                        <div className="citations">
                           {field.evidence.map((e, i) => (
-                            <button
-                              className="evidence"
+                            <Button
+                              appearance="subtle"
+                              className={`citation ${citation?.document === e.document_id && citation.quote === e.quote ? "active" : ""}`}
+                              size="small"
+                              title={e.quote}
+                              aria-label={`Show ${e.document}, page ${e.page}: ${e.quote}`}
                               key={i}
                               onClick={() => {
                                 setSource(e.document_id);
-                                document
-                                  .querySelector(".documents")
-                                  ?.scrollIntoView({
-                                    behavior: "instant",
-                                    block: "start",
-                                  });
+                                setCitation({
+                                  document: e.document_id,
+                                  page: e.page,
+                                  quote: e.quote,
+                                });
                               }}
                             >
-                              <q>{e.quote}</q>
-                              <small>
-                                {e.document} · page {e.page} ↗
-                              </small>
-                            </button>
+                              <span className="citation-location">
+                                {e.document} · p{e.page}
+                              </span>
+                            </Button>
                           ))}
                         </div>
                         {current.status === "pending" && (
-                          <label className="correction">
-                            Reviewer correction{" "}
-                            <span>(optional; requires a reason below)</span>
-                            <input
+                          <Field
+                            className="correction"
+                            label={`Correct ${field.label.toLowerCase()}`}
+                          >
+                            <Input
                               aria-label={`Correct ${field.label}`}
                               value={corrections[key] ?? ""}
                               placeholder={
-                                field.value || "Enter verified value"
+                                field.value || "Enter verified value…"
                               }
                               maxLength={200}
                               onChange={(e) =>
@@ -483,96 +614,105 @@ function App() {
                                 })
                               }
                             />
-                          </label>
+                          </Field>
                         )}
-                      </article>
+                      </section>
                     ))}
-                  </section>
-                  <section className="decision">
-                    <h3>03 / Human review</h3>
+                  </div>
+                  <section
+                    className="decision"
+                    aria-labelledby="decision-heading"
+                  >
+                    <h2 id="decision-heading">Human review</h2>
                     {current.status === "pending" ? (
                       <>
-                        <label>
-                          Reason for your decision
-                          <textarea
+                        <Field
+                          label="Reason for your decision"
+                          hint="Approval requires all document types and resolved fields. Corrections do not alter source documents."
+                        >
+                          <Textarea
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
                             placeholder="Describe the evidence you checked and why this resolution is appropriate…"
                             minLength={5}
                             maxLength={2000}
+                            resize="vertical"
+                            rows={3}
                           />
-                        </label>
-                        <p className="small">
-                          Approval requires all document types and resolved
-                          fields. Corrections do not alter source documents.
-                        </p>
-                        <div className="actions">
-                          <button
+                        </Field>
+                        <div className="decision-actions">
+                          <Button
+                            appearance="primary"
+                            icon={<Checkmark20Regular />}
                             disabled={busy || reason.trim().length < 5}
                             onClick={() => review("approved")}
                           >
                             Approve supplier
-                          </button>
-                          <button
-                            className="secondary"
+                          </Button>
+                          <Button
+                            icon={<Save20Regular />}
                             disabled={busy || reason.trim().length < 5}
                             onClick={() => review("save")}
                           >
                             Save corrections
-                          </button>
-                          <button
-                            className="quiet danger"
+                          </Button>
+                          <Button
+                            appearance="subtle"
+                            icon={<Dismiss20Regular />}
                             disabled={busy || reason.trim().length < 5}
                             onClick={() => review("rejected")}
                           >
                             Reject application
-                          </button>
+                          </Button>
                         </div>
                       </>
                     ) : (
-                      <p>
-                        This application was {current.status}. Documents and
-                        decisions are preserved as a read-only record.
-                      </p>
+                      <MessageBar intent="info">
+                        <MessageBarBody>
+                          This application was {current.status}. Documents and
+                          decisions are preserved as a read-only record.
+                        </MessageBarBody>
+                      </MessageBar>
                     )}
                   </section>
-                  <section className="audit">
-                    <h3>04 / Decision history</h3>
-                    {current.events.map((e, i) => (
-                      <div className="event" key={i}>
-                        <span className="event-dot" />
-                        <div>
-                          <strong>{e.action}</strong>
+                  <section
+                    className="history"
+                    aria-labelledby="history-heading"
+                  >
+                    <h2 id="history-heading">Decision history</h2>
+                    <ol>
+                      {current.events.map((event, i) => (
+                        <li key={i}>
+                          <div className="event-heading">
+                            <strong>{event.action}</strong>
+                            <time dateTime={event.at}>
+                              {new Date(event.at).toLocaleString()}
+                            </time>
+                          </div>
                           <p>
-                            {e.details.reason ||
-                              e.details.note ||
+                            {event.details.reason ||
+                              event.details.note ||
                               "Recorded in the application audit trail."}
                           </p>
-                          <small>
-                            {e.actor} · {new Date(e.at).toLocaleString()}
-                          </small>
-                        </div>
-                      </div>
-                    ))}
+                          <span>{event.actor}</span>
+                        </li>
+                      ))}
+                    </ol>
                   </section>
                 </section>
-              ) : (
-                <section className="empty">
-                  <h2>Your review desk is ready.</h2>
-                  <p>
-                    Create an application, then upload the three document types.
-                  </p>
-                </section>
-              )}
-            </div>
-          </>
+              </div>
+            ) : (
+              <section className="empty-workspace">
+                <h1>No application selected</h1>
+                <p>
+                  Create an application, then upload the three document types.
+                </p>
+              </section>
+            )}
+          </div>
         )}
       </main>
-      <footer>
-        <span>Supplier Studio / Built by Travis Vercueil</span>
-        <span>Synthetic data. Human decisions. Traceable evidence.</span>
-      </footer>
-    </>
+    </FluentProvider>
   );
 }
 createRoot(document.getElementById("root")!).render(

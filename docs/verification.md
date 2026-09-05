@@ -9,3 +9,5 @@ Local verification performed on 5 September 2026 using Python 3.12, Node 24 and 
 - Real PostgreSQL HTTP smoke: session/CSRF login, create application, three multipart uploads, conflicting registration evidence, corrected approval and persisted audit all passed. Restarting Django preserved the approval, three documents and audit history, verified with a fresh authenticated HTTP session.
 
 The HTTP smoke used only repository synthetic text fixtures. Tests also create and parse an actual text-based PDF, reject scanned/invalid PDFs, and enforce review/authentication boundaries. This record does not imply production readiness, load testing, live-provider evaluation or tamper-proof auditing.
+
+- Enterprise redesign follow-up: browser-like HTTP requests through the Vite proxy verified session login and authenticated case access with a real `Origin` header. An untrusted origin with a valid CSRF cookie/token remains rejected with HTTP 403. The proxy now preserves the browser Host instead of rewriting it to the backend port. Reproduce with `python scripts/smoke_proxy.py` while both local servers run.
