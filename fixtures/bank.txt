@@ -1,0 +1,4 @@
+SYNTHETIC DEMO — not a real bank account
+Bank confirmation
+Supplier name: Cedar Works
+Bank account: DEMO-ACCOUNT-0192
