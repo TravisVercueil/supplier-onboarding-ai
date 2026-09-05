@@ -1,6 +1,9 @@
 import { defineConfig } from "vite";
 export default defineConfig({
-  server: { proxy: { "/api": "http://127.0.0.1:8102" } },
+  server: {
+    // Keep the browser Host so Django can enforce same-origin CSRF through Vite.
+    proxy: { "/api": { target: "http://127.0.0.1:8102", changeOrigin: false } },
+  },
   build: {
     rollupOptions: {
       onwarn(warning, warn) {

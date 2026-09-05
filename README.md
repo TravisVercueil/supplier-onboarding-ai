@@ -31,7 +31,7 @@ Open [localhost:5202](http://127.0.0.1:5202). No account, backend, model key or 
 ### Two-minute walkthrough
 
 1. Open **Cedar Works · supplier application**. The registration number is marked **Conflict**.
-2. Click the certificate evidence: it says `DEMO-2024-001`; the onboarding form says `DEMO-2024-009`.
+2. Click the registration certificate citation in **Review details**: it says `DEMO-2024-001`; the onboarding form says `DEMO-2024-009`.
 3. Enter `DEMO-2024-001` in **Correct Registration number**. Add the reason: “Verified the registration certificate; the onboarding form contains a typo.”
 4. Choose **Approve supplier**. The application becomes read-only, and the decision appears in the history.
 5. Create another application and try approval without documents. The backend/sandbox blocks it. Reset the sandbox to explore again.
@@ -58,7 +58,7 @@ npm run dev --prefix frontend -- --host 127.0.0.1 --port 5102
 
 Open [localhost:5102](http://127.0.0.1:5102). Sign in with `reviewer` / `local-review-only`. These are intentionally public **local demo credentials**. `DEMO_PASSWORD` overrides the password when the user is first created. Demo seeding is idempotent and does not overwrite existing decisions or credentials.
 
-The frontend proxies `/api` to Django on port 8102; it never receives model credentials. Use the files in [`fixtures/`](fixtures/) for uploads. Uploads are processed synchronously, limited to 5 MB, 20 PDF pages and 60,000 characters. Scanned/OCR-only PDFs and encrypted PDFs are unsupported. PDF/text content is stored as extracted text, not the original binary.
+The frontend proxies `/api` to Django on port 8102 while preserving the browser Host for Django’s same-origin CSRF checks; it never receives model credentials. Use the files in [`fixtures/`](fixtures/) for uploads. Uploads are processed synchronously, limited to 5 MB, 20 PDF pages and 60,000 characters. Scanned/OCR-only PDFs and encrypted PDFs are unsupported. PDF/text content is stored as extracted text, not the original binary.
 
 ### PostgreSQL
 
@@ -101,6 +101,8 @@ python manage.py makemigrations --check --dry-run
 npm test --prefix frontend
 npm run build --prefix frontend
 VITE_DEMO_MODE=true npm run build --prefix frontend
+# With the full local frontend and backend running:
+python scripts/smoke_proxy.py
 ```
 
 The backend suite covers session access, CSRF, invalid uploads, actual text-PDF parsing, evidence validation, repeated-field conflicts, review requirements, rollback, audit persistence and decision immutability. The frontend sandbox suite exercises conflict resolution, blocked approval and new-evidence invalidation.
