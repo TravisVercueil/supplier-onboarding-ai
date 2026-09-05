@@ -6,6 +6,8 @@ A reviewer receives a supplier pack, compares extracted information with its sou
 
 > **[Open the live sandbox →](https://supplier-onboarding-ai.vercel.app)** — synthetic documents, browser-local review state and **no live AI calls**. The complete Django application runs locally with real text/PDF uploads, database persistence and an optional model adapter. This is a portfolio MVP, not a production compliance service.
 
+The interface uses official Fluent UI React components: an application queue, document evidence and reviewer controls arranged side by side. See [DESIGN.md](DESIGN.md) for the reference analysis, component choices and responsive layout.
+
 ## What you can do
 
 - Create an application and upload registration, bank-confirmation and onboarding documents.
