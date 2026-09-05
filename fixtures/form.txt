@@ -1,0 +1,5 @@
+SYNTHETIC DEMO — intentionally conflicting application
+Supplier onboarding form
+Supplier name: Cedar Works
+Registration number: DEMO-2024-009
+Bank account: DEMO-ACCOUNT-0192
