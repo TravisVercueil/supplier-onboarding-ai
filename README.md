@@ -4,7 +4,7 @@
 
 A reviewer receives a supplier pack, compares extracted information with its source documents, resolves contradictions and records a decision. The application keeps the original evidence alongside corrections and an audit history. Built by [Travis Vercueil](https://github.com/TravisVercueil).
 
-> **[Open the live sandbox →](https://supplier-onboarding-ai.vercel.app)** — synthetic documents, browser-local review state and **no live AI calls**. The complete Django application runs locally with real text/PDF uploads, database persistence and an optional model adapter. This is a portfolio MVP, not a production compliance service.
+> **[Open the live sandbox →](https://suppliers.travisvercueil.dev)** — synthetic documents, browser-local review state and **no live AI calls**. The complete Django application runs locally with real text/PDF uploads, database persistence and an optional model adapter. This is a portfolio MVP, not a production compliance service.
 
 The interface uses official Fluent UI React components: an application queue, document evidence and reviewer controls arranged side by side. See [DESIGN.md](DESIGN.md) for the reference analysis, component choices and responsive layout.
 
